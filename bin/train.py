@@ -43,8 +43,8 @@ class TrainGAN(abc.ABC):
             self.device = torch.device('cpu')
             logging.info(f"device: cpu")
         else:
-            self.device = torch.device('cuda')
-            logging.info(f"device: gpu")
+            self.device = torch.device('cuda:3')
+            logging.info("device: gpu 3")
             torch.cuda.manual_seed_all(args.seed)
             if args.disable_cudnn == "False":
                 torch.backends.cudnn.benchmark = True
