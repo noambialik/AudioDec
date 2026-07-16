@@ -137,11 +137,12 @@ docker compose up tensorboard
 Open `http://localhost:6006`. Compose maps host port 6006 to the TensorBoard
 server, which reads every experiment beneath `/workspace/data/audiodec/exp`.
 
-Compose pins host GPU index 1. NVIDIA exposes that single device as `cuda:0`
-inside the container. The service runs as the owner of the mounted data root,
-so checkpoints are not left root-owned. Checkpoints and TensorBoard logs are
-written beneath the path below. When training exits, the service posts its
-success or failure, host, and duration to `https://ntfy.sh/noamb_audiodec`.
+Compose exposes host GPU indices 0 through 3 to the container in the same
+order, so `--gpu N` selects host GPU N. The service runs as the owner of the
+mounted data root, so checkpoints are not left root-owned. Checkpoints and
+TensorBoard logs are written beneath the path below. When training exits, the
+service posts its success or failure, host, and duration to
+`https://ntfy.sh/noamb_audiodec`.
 
 ```text
 /home/dsi/noamb/data_dir/docker_data_volume/audiodec/exp/autoencoder/symAD_libritts_24000_hop300
