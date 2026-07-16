@@ -148,7 +148,8 @@ server, which reads every experiment beneath `/workspace/data/audiodec/exp`.
 Compose pins host GPU index 1. NVIDIA exposes that single device as `cuda:0`
 inside the container. The service runs as the owner of the mounted data root,
 so checkpoints are not left root-owned. Checkpoints and TensorBoard logs are
-written beneath:
+written beneath the path below. When training exits, the service posts its
+success or failure, host, and duration to `https://ntfy.sh/noamb_audiodec`.
 
 ```text
 /dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume/audiodec/exp/autoencoder/symAD_libritts_24000_hop300
@@ -266,5 +267,4 @@ Since this paper focuses on providing a well-developed streamable neural codec i
 For many applications such as denoising, updating only the encoder achieves almost the same performance as updating the whole model. For applications involving decoder updating such as binaural rending, it might be better to design specific discriminators for that application. Therefore, we release only the generators.
 4. **Can AudioDec encode/decode multi-channel signals?**  
 Yes, you can train a MIMO model by changing the input_channels and output_channels in the config. One lesson I learned in training a MIMO model is that although the generator is MIMO, reshaping the generator output signal to mono for the following discriminator will markedly improve the MIMO audio quality.
-
 

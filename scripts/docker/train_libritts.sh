@@ -1,10 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-python -c 'import torch; assert torch.cuda.is_available(), "CUDA is required"; assert torch.cuda.device_count() == 1, "expected exactly one mapped GPU"; print(f"Training on {torch.cuda.get_device_name(0)} as cuda:0")'
+started_at_seconds="$(date +%s)"
 
-exec python /workspace/AudioDec/codecTrain.py \
+set +e
+python -c 'import torch; assert torch.cuda.is_available(), "CUDA is required"; assert torch.cuda.device_count() == 1, "expected exactly one mapped GPU"; print(f"Training on {torch.cuda.get_device_name(0)} as cuda:0")' && \
+python /workspace/AudioDec/codecTrain.py \
     --config /workspace/AudioDec/config/autoencoder/symAD_libritts_24000_hop300.yaml \
     --tag autoencoder/symAD_libritts_24000_hop300 \
     --exp_root /workspace/data/audiodec/exp \
     "$@"
+training_status=$?
+set -e
+
+if [[ "${training_status}" -eq 0 ]]; then
+  result=finished
+  status=success
+else
+  result=failed
+  status=failed
+fi
+duration_seconds="$(( $(date +%s) - started_at_seconds ))"
+printf -v body 'status=%s\nhost=%s\nduration_seconds=%s\n' \
+  "${status}" "$(hostname)" "${duration_seconds}"
+
+if ! python -c 'import sys; from urllib import request; req = request.Request("https://ntfy.sh/noamb_audiodec", data=sys.argv[2].encode("utf-8"), method="POST", headers={"Title": sys.argv[1], "Content-Type": "text/plain; charset=utf-8"}); request.urlopen(req, timeout=10).close()' \
+  "AudioDec LibriTTS training ${result}" "${body}"; then
+  echo "ntfy notification failed; preserving training exit status ${training_status}." >&2
+fi
+
+exit "${training_status}"
