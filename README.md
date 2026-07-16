@@ -92,17 +92,9 @@ $ python demoFile.py --model libritts_v1 -i xxx.wav -o ooo.wav
 
 
 ## Training and testing the whole AudioDec pipeline
-1. Prepare the training/validation/test utterances and put them in three different folders  
-   ex: **corpus/train**, **corpus/dev**, and **corpus/test**
-2. Modify the paths (ex: /mnt/home/xxx/datasets) in  
-   **submit_codec_vctk.sh**  
-   **config/autoencoder/symAD_vctk_48000_hop300.yaml**  
-   **config/statistic/symAD_vctk_48000_hop300_clean.yaml**  
-   **config/vocoder/AudioDec_v1_symAD_vctk_48000_hop300_clean.yaml**
-3. Assign corresponding `analyzer` and `stats` in 
-   **config/statistic/symAD_vctk_48000_hop300_clean.yaml**  
-   **config/vocoder/AudioDec_v1_symAD_vctk_48000_hop300_clean.yaml**
-4. Follow the usage instructions in **submit_codec_vctk.sh** to run the training and testing
+The retained configs support the 24 kHz LibriTTS symmetric autoencoder and
+vocoder pipeline:
+
 ```bash
 # stage 0: training autoencoder from scratch
 # stage 1: extracting statistics
@@ -111,17 +103,18 @@ $ python demoFile.py --model libritts_v1 -i xxx.wav -o ooo.wav
 # stage 4: testing (AE + Vocoder)
 
 # Run stages 0-4
-$ bash submit_codec.sh --start 0 --stop 4 \
---autoencoder "autoencoder/symAD_vctk_48000_hop300" \
---statistic "stati/symAD_vctk_48000_hop300_clean" \
---vocoder "vocoder/AudioDec_v1_symAD_vctk_48000_hop300_clean"  
+$ bash submit_codec_libritts.sh --start 0 --stop 4 \
+--autoencoder "autoencoder/symAD_libritts_24000_hop300" \
+--statistic "statistic/symAD_libritts_24000_hop300_clean" \
+--vocoder "vocoder/AudioDec_v1_symAD_libritts_24000_hop300_clean"
 ```
 
 ## Docker training for the 24 kHz LibriTTS autoencoder
 
 This fork includes a Docker Compose service for the upstream
 `symAD_libritts_24000_hop300` autoencoder training recipe. It uses the shared
-host data volume and expects prepared 24 kHz mono WAV files in:
+host data volume and retains only the LibriTTS 24 kHz training and checkpoint
+configurations. It expects prepared 24 kHz mono WAV files in:
 
 ```text
 /home/dsi/noamb/data_dir/docker_data_volume/libritts/train-clean-460
@@ -169,17 +162,17 @@ docker compose run --rm train-libritts \
 ```bash
 # Train AutoEncoder from scratch
 $ bash submit_autoencoder.sh --stage 0 \
---tag_name "autoencoder/symAD_vctk_48000_hop300"
+--tag_name "autoencoder/symAD_libritts_24000_hop300"
 
 # Resume AutoEncoder from previous iterations
 $ bash submit_autoencoder.sh --stage 1 \
---tag_name "autoencoder/symAD_vctk_48000_hop300" \
---resumepoint 200000
+--tag_name "autoencoder/symAD_libritts_24000_hop300" \
+--resumepoint 500000
 
 # Test AutoEncoder
 $ bash submit_autoencoder.sh --stage 2 \
---tag_name "autoencoder/symAD_vctk_48000_hop300"
---subset "clean_test"
+--tag_name "autoencoder/symAD_libritts_24000_hop300" \
+--subset "test"
 ```
 
 ## Pre-trained Models
@@ -187,48 +180,13 @@ All pre-trained models can be accessed via [exp](https://github.com/facebookrese
 
 | AutoEncoder | Corpus | Fs | Bitrate | Path |  
 |---  |---  |---  |---  |---  |
-| symAD | VCTK | 48 kHz | 24 kbps | `exp/autoencoder/symAD_c16_vctk_48000_hop320`  |
-| symAAD | VCTK | 48 kHz | 12.8 kbps  | `exp/autoencoder/symAAD_vctk_48000_hop300`  |
-| symAD | VCTK | 48 kHz | 12.8 kbps | `exp/autoencoder/symAD_vctk_48000_hop300`  |
-| symAD_univ | VCTK | 48 kHz | 12.8 kbps  | `exp/autoencoder/symADuniv_vctk_48000_hop300`  |
 | symAD | LibriTTS | 24 kHz | 6.4 kbps  | `exp/autoencoder/symAD_libritts_24000_hop300`  |
 
 
 
 | Vocoder | Corpus | Fs | Path |
 |---  |---  |---  |---  |
-| AD v0 | VCTK | 48 kHz | `exp/vocoder/AudioDec_v0_symAD_vctk_48000_hop300_clean` |
-| AD v1 | VCTK | 48 kHz | `exp/vocoder/AudioDec_v1_symAD_vctk_48000_hop300_clean` |
-| AD v2 | VCTK | 48 kHz | `exp/vocoder/AudioDec_v2_symAD_vctk_48000_hop300_clean` |
-| AD_univ | VCTK | 48 kHz | `exp/vocoder/AudioDec_v3_symADuniv_vctk_48000_hop300_clean` |
 | AD v1 | LibriTTS | 24 kHz | `exp/vocoder/AudioDec_v1_symAD_libritts_24000_hop300_clean` |
-
-
-
-
-## Bonus Track: Denoising
-1. It is easy to perform denoising by just updating the encoder using noisy-clean pairs (keeping the decoder/vocoder the same).
-2. Prepare the noisy-clean corpus and follow the usage instructions in **submit_denoise.sh** to run the training and testing
-```bash
-# Update the Encoder for denoising
-$ bash submit_denoise.sh --stage 0 \
---tag_name "denoise/symAD_vctk_48000_hop300"
-
-# Denoise
-$ bash submit_denoise.sh --stage 2 \
---encoder "denoise/symAD_vctk_48000_hop300"
---decoder "vocoder/AudioDec_v1_symAD_vctk_48000_hop300_clean"
---encoder_checkpoint 200000
---decoder_checkpoint 500000
---subset "noisy_test"
-
-# Stream demo w/ GPU
-$ python demoStream.py --tx_cuda 0 --rx_cuda 0 --input_device 1 --output_device 4 --model vctk_denoise
-
-# Codec demo w/ files
-$ python demoFile.py -i xxx.wav -o ooo.wav --model vctk_denoise
-
-```
 
 
 ## Citation

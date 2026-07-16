@@ -12,11 +12,11 @@
 ###########################################################
 sampling_rate: &sampling_rate 24000
 data:
-    path: /mnt/home/yichiaowu/datasets/LibriTTS/LibriTTS/24000
+    path: /workspace/data/libritts
     subset:
-        train: train-clean-450
-        valid: dev-clean-1utt
-        test:  test-clean-1utt
+        train: train-clean-460
+        valid: test-clean
+        test:  test-clean
 
 ###########################################################
 #                   MODEL SETTING                         #
