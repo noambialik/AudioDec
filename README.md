@@ -125,7 +125,7 @@ Build and start training from the `AudioDec` directory:
 
 ```bash
 docker compose build
-docker compose run --rm train-libritts
+docker compose run --rm train-libritts --gpu 0
 ```
 
 Start TensorBoard in a second terminal:

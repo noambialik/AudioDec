@@ -40,8 +40,10 @@ def resolve_training_device(gpu_index):
         logging.info("device: cpu")
         return torch.device("cpu")
 
+    device = torch.device(f"cuda:{gpu_index}")
+    torch.cuda.set_device(device)
     logging.info("device: gpu %d", gpu_index)
-    return torch.device(f"cuda:{gpu_index}")
+    return device
 
 
 class TrainGAN(abc.ABC):
@@ -59,10 +61,10 @@ class TrainGAN(abc.ABC):
         # Fix seed and make backends deterministic
         random.seed(args.seed)
         np.random.seed(args.seed)
-        torch.manual_seed(args.seed)
+        torch.default_generator.manual_seed(args.seed)
         self.device = resolve_training_device(args.gpu)
         if self.device.type == "cuda":
-            torch.cuda.manual_seed_all(args.seed)
+            torch.cuda.manual_seed(args.seed)
             if args.disable_cudnn == "False":
                 torch.backends.cudnn.benchmark = True
         

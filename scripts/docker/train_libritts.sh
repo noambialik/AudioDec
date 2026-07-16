@@ -20,7 +20,7 @@ if [[ "${explicit_config}" == false ]]; then
 fi
 
 set +e
-python -c 'import torch; assert torch.cuda.is_available(), "CUDA is required"; assert torch.cuda.device_count() == 1, "expected exactly one mapped GPU"; print(f"Training on {torch.cuda.get_device_name(0)} as cuda:0")' && \
+python -c 'import torch; assert torch.cuda.is_available(), "CUDA is required"; assert torch.cuda.device_count() == 4, f"expected 4 mapped GPUs, found {torch.cuda.device_count()}"; print("Mapped GPUs:", ", ".join(f"cuda:{index}={torch.cuda.get_device_name(index)}" for index in range(torch.cuda.device_count())))' && \
 python /workspace/AudioDec/codecTrain.py \
     --exp_root /workspace/data/audiodec/exp \
     "${training_args[@]}"
