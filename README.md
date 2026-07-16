@@ -117,6 +117,42 @@ $ bash submit_codec.sh --start 0 --stop 4 \
 --vocoder "vocoder/AudioDec_v1_symAD_vctk_48000_hop300_clean"  
 ```
 
+## Docker training for the 24 kHz LibriTTS autoencoder
+
+This fork includes a Docker Compose service for the upstream
+`symAD_libritts_24000_hop300` autoencoder training recipe. It uses the same
+host data volume as the parent VoIPCodec project and expects prepared 24 kHz
+mono WAV files in:
+
+```text
+/dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume/voipcodec/source/clean/train
+/dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume/voipcodec/source/clean/eval
+```
+
+Build and start training from the `AudioDec` directory:
+
+```bash
+docker compose build
+docker compose run --rm train-libritts
+```
+
+Compose pins host GPU index 1. NVIDIA exposes that single device as `cuda:0`
+inside the container. The service runs as the owner of the mounted data root,
+so checkpoints are not left root-owned. Checkpoints and TensorBoard logs are
+written beneath:
+
+```text
+/dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume/audiodec/exp/autoencoder/symAD_libritts_24000_hop300
+```
+
+Resume from an existing checkpoint by passing the container path through to
+the upstream trainer:
+
+```bash
+docker compose run --rm train-libritts \
+  --resume /workspace/data/audiodec/exp/autoencoder/symAD_libritts_24000_hop300/checkpoint-500000steps.pkl
+```
+
 
 ## Training and testing only the AutoEncoder
 1. Prepare the training/validation/test utterances and modify the paths 
@@ -221,8 +257,6 @@ Since this paper focuses on providing a well-developed streamable neural codec i
 For many applications such as denoising, updating only the encoder achieves almost the same performance as updating the whole model. For applications involving decoder updating such as binaural rending, it might be better to design specific discriminators for that application. Therefore, we release only the generators.
 4. **Can AudioDec encode/decode multi-channel signals?**  
 Yes, you can train a MIMO model by changing the input_channels and output_channels in the config. One lesson I learned in training a MIMO model is that although the generator is MIMO, reshaping the generator output signal to mono for the following discriminator will markedly improve the MIMO audio quality.
-
-
 
 
 

@@ -1,0 +1,19 @@
+name: audiodec
+
+services:
+  train-libritts:
+    build:
+      context: .
+    image: noamb_audiodec:latest
+    working_dir: /workspace/AudioDec
+    entrypoint: ["/workspace/AudioDec/scripts/docker/run_as_data_owner.sh", "/workspace/AudioDec/scripts/docker/train_libritts.sh"]
+    command: []
+    volumes:
+      - /dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume:/workspace/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
