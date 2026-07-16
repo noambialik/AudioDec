@@ -20,6 +20,8 @@ from collections import defaultdict
 from tensorboardX import SummaryWriter
 from tqdm import tqdm
 
+from trainer.checkpoint import retried_save_checkpoint
+
 
 class TrainerGAN(abc.ABC):
     def __init__(
@@ -118,7 +120,7 @@ class TrainerGAN(abc.ABC):
 
         if not os.path.exists(os.path.dirname(checkpoint_path)):
             os.makedirs(os.path.dirname(checkpoint_path))
-        torch.save(state_dict, checkpoint_path)
+        retried_save_checkpoint(state_dict, checkpoint_path)
 
 
     def load_checkpoint(self, checkpoint_path, strict=True, load_only_params=False, load_discriminator=True):
