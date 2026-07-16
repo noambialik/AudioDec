@@ -17,3 +17,14 @@ services:
             - driver: nvidia
               device_ids: ["1"]
               capabilities: [gpu]
+
+  tensorboard:
+    build:
+      context: .
+    image: noamb_audiodec:latest
+    entrypoint: ["/workspace/AudioDec/scripts/docker/run_as_data_owner.sh", "tensorboard"]
+    command: ["--logdir", "/workspace/data/audiodec/exp", "--host", "0.0.0.0", "--port", "6006"]
+    volumes:
+      - /dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume:/workspace/data
+    ports:
+      - "6006:6006"

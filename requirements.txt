@@ -9,4 +9,4 @@ argparse
 pyyaml
 tqdm
 tensorboardX
-
+tensorboard
