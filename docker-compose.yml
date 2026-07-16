@@ -9,7 +9,7 @@ services:
     entrypoint: ["/workspace/AudioDec/scripts/docker/run_as_data_owner.sh", "/workspace/AudioDec/scripts/docker/train_libritts.sh"]
     command: []
     volumes:
-      - /dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume:/workspace/data
+      - /home/dsi/noamb/data_dir/docker_data_volume:/workspace/data
     deploy:
       resources:
         reservations:
@@ -25,6 +25,6 @@ services:
     entrypoint: ["/workspace/AudioDec/scripts/docker/run_as_data_owner.sh", "tensorboard"]
     command: ["--logdir", "/workspace/data/audiodec/exp", "--host", "0.0.0.0", "--port", "6006"]
     volumes:
-      - /dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume:/workspace/data
+      - /home/dsi/noamb/data_dir/docker_data_volume:/workspace/data
     ports:
       - "6006:6006"

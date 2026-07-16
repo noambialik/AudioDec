@@ -12,11 +12,11 @@
 ###########################################################
 sampling_rate: &sampling_rate 24000
 data:
-    path: /workspace/data/voipcodec/source/clean
+    path: /workspace/data/libritts
     subset:
-        train: train
-        valid: eval
-        test:  eval
+        train: train-clean-460
+        valid: test-clean
+        test:  test-clean
 
 ###########################################################
 #                   MODEL SETTING                         #

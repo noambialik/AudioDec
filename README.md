@@ -120,13 +120,12 @@ $ bash submit_codec.sh --start 0 --stop 4 \
 ## Docker training for the 24 kHz LibriTTS autoencoder
 
 This fork includes a Docker Compose service for the upstream
-`symAD_libritts_24000_hop300` autoencoder training recipe. It uses the same
-host data volume as the parent VoIPCodec project and expects prepared 24 kHz
-mono WAV files in:
+`symAD_libritts_24000_hop300` autoencoder training recipe. It uses the shared
+host data volume and expects prepared 24 kHz mono WAV files in:
 
 ```text
-/dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume/voipcodec/source/clean/train
-/dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume/voipcodec/source/clean/eval
+/home/dsi/noamb/data_dir/docker_data_volume/libritts/train-clean-460
+/home/dsi/noamb/data_dir/docker_data_volume/libritts/test-clean
 ```
 
 Build and start training from the `AudioDec` directory:
@@ -152,7 +151,7 @@ written beneath the path below. When training exits, the service posts its
 success or failure, host, and duration to `https://ntfy.sh/noamb_audiodec`.
 
 ```text
-/dsi/gannot-lab/gannot-lab1/users/Noam/docker_data_volume/audiodec/exp/autoencoder/symAD_libritts_24000_hop300
+/home/dsi/noamb/data_dir/docker_data_volume/audiodec/exp/autoencoder/symAD_libritts_24000_hop300
 ```
 
 Resume from an existing checkpoint by passing the container path through to
@@ -267,4 +266,3 @@ Since this paper focuses on providing a well-developed streamable neural codec i
 For many applications such as denoising, updating only the encoder achieves almost the same performance as updating the whole model. For applications involving decoder updating such as binaural rending, it might be better to design specific discriminators for that application. Therefore, we release only the generators.
 4. **Can AudioDec encode/decode multi-channel signals?**  
 Yes, you can train a MIMO model by changing the input_channels and output_channels in the config. One lesson I learned in training a MIMO model is that although the generator is MIMO, reshaping the generator output signal to mono for the following discriminator will markedly improve the MIMO audio quality.
-
