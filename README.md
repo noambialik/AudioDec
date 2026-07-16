@@ -147,12 +147,22 @@ success or failure, host, and duration to `https://ntfy.sh/noamb_audiodec`.
 /home/dsi/noamb/data_dir/docker_data_volume/audiodec/exp/autoencoder/symAD_libritts_24000_hop300
 ```
 
+Training requires `--gpu` with an index from 0 through 3. For example, run a
+specific training configuration on the GPU exposed as `cuda:0`:
+
+```bash
+docker compose run --rm train-libritts \
+  --config config/autoencoder/symAD_libritts_24000_hop300_train-clean-460_19200.yaml \
+  --gpu 0
+```
+
 Resume from an existing checkpoint by passing the container path through to
 the upstream trainer:
 
 ```bash
 docker compose run --rm train-libritts \
-  --resume /workspace/data/audiodec/exp/autoencoder/symAD_libritts_24000_hop300/checkpoint-500000steps.pkl
+  --resume /workspace/data/audiodec/exp/autoencoder/symAD_libritts_24000_hop300/checkpoint-500000steps.pkl \
+  --gpu 0
 ```
 
 

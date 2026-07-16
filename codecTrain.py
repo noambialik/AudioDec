@@ -27,7 +27,7 @@ from models.vocoder.UnivNet import Discriminator as discriminator_univnet
 from trainer.autoencoder import Trainer as TrainerAutoEncoder
 from trainer.vocoder import Trainer as TrainerVocoder
 from trainer.denoise import Trainer as TrainerDenoise
-from bin.train import TrainGAN
+from bin.train import TrainGAN, add_gpu_argument
 
 from losses import DiscriminatorAdversarialLoss
 from losses import FeatureMatchLoss
@@ -277,6 +277,7 @@ def main():
     )
     parser.add_argument('--seed', default=1337, type=int)
     parser.add_argument('--disable_cudnn', choices=('True','False'), default='False', help='Disable CUDNN')
+    add_gpu_argument(parser)
     args = parser.parse_args()
         
     # initial train_main

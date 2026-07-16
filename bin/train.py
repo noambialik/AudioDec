@@ -23,6 +23,27 @@ import numpy as np
 from bin.utils import load_config
 
 
+def add_gpu_argument(parser):
+    """Add the required training GPU index argument to an argument parser."""
+    parser.add_argument(
+        "--gpu",
+        type=int,
+        choices=range(4),
+        required=True,
+        help="GPU index to use for training (0-3)",
+    )
+
+
+def resolve_training_device(gpu_index):
+    """Resolve the requested CUDA device, preserving the CPU fallback."""
+    if not torch.cuda.is_available():
+        logging.info("device: cpu")
+        return torch.device("cpu")
+
+    logging.info("device: gpu %d", gpu_index)
+    return torch.device(f"cuda:{gpu_index}")
+
+
 class TrainGAN(abc.ABC):
     def __init__(
         self,
@@ -39,12 +60,8 @@ class TrainGAN(abc.ABC):
         random.seed(args.seed)
         np.random.seed(args.seed)
         torch.manual_seed(args.seed)
-        if not torch.cuda.is_available():
-            self.device = torch.device('cpu')
-            logging.info(f"device: cpu")
-        else:
-            self.device = torch.device('cuda:3')
-            logging.info("device: gpu 3")
+        self.device = resolve_training_device(args.gpu)
+        if self.device.type == "cuda":
             torch.cuda.manual_seed_all(args.seed)
             if args.disable_cudnn == "False":
                 torch.backends.cudnn.benchmark = True
