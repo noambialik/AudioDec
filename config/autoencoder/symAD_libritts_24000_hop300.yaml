@@ -175,5 +175,5 @@ start_steps:                       # Number of steps to start training
 train_max_steps: 500000            # Number of training steps. (w/o adv)
 adv_train_max_steps: 1000000       # Number of training steps. (w/ adv)
 save_interval_steps: 100000        # Interval steps to save checkpoint.
-eval_interval_steps: 1000          # Interval steps to evaluate the network.
+eval_interval_steps: 10000         # Interval steps to evaluate the network.
 log_interval_steps: 100            # Interval steps to record the training log.
