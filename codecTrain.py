@@ -270,7 +270,7 @@ class TrainMain(TrainGAN):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', type=str, required=True)
-    parser.add_argument("--tag", type=str, required=True)
+    parser.add_argument("--tag", type=str)
     parser.add_argument("--exp_root", type=str, default="exp")
     parser.add_argument("--resume", default="", type=str, nargs="?",
         help='checkpoint file path to resume training. (default="")',

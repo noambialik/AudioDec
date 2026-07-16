@@ -20,7 +20,7 @@ import logging
 import torch
 import numpy as np
 
-from bin.utils import load_config
+from bin.utils import load_config, load_training_config, resolve_experiment_tag
 
 
 def add_gpu_argument(parser):
@@ -67,12 +67,13 @@ class TrainGAN(abc.ABC):
                 torch.backends.cudnn.benchmark = True
         
         # initialize config
-        with open(args.config, 'r') as f:
-            self.config = yaml.load(f, Loader=yaml.FullLoader)
+        self.config = load_training_config(args.config)
+        tag = resolve_experiment_tag(self.config, args.tag)
         self.config.update(vars(args))
+        self.config["tag"] = tag
 
         # initialize model folder
-        expdir = os.path.join(args.exp_root, args.tag)
+        expdir = os.path.join(args.exp_root, tag)
         os.makedirs(expdir, exist_ok=True)
         self.config["outdir"] = expdir
 

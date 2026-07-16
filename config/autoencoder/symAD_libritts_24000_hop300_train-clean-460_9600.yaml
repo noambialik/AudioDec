@@ -1,0 +1,2 @@
+base_config: symAD_libritts_24000_hop300.yaml
+tag: autoencoder/symAD_libritts_24000_hop300_train-clean-460_9600
