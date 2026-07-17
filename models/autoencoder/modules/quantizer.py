@@ -29,8 +29,11 @@ class Quantizer(torch.nn.Module):
     def initial(self):
         self.codebook.initial()    
     
-    def forward(self, z):
-        zq, vqloss, perplexity = self.codebook(z.transpose(2, 1))
+    def forward(self, z, num_context_frames=0):
+        zq, vqloss, perplexity = self.codebook(
+            z.transpose(2, 1),
+            num_context_frames=num_context_frames,
+        )
         zq = zq.transpose(2, 1)        
         return zq, vqloss, perplexity
     

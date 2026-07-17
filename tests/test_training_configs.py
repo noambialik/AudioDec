@@ -18,18 +18,22 @@ CONFIG_MATRIX = {
     "symAD_libritts_24000_hop300_train-clean-460_9600.yaml": (
         "train-clean-460",
         9600,
+        0,
     ),
-    "symAD_libritts_24000_hop300_train-clean-460_19200.yaml": (
+    "symAD_libritts_24000_hop300_train-clean-460_9600_context15900.yaml": (
         "train-clean-460",
-        19200,
+        9600,
+        15900,
     ),
     "symAD_libritts_24000_hop300_train-clean-460_normalized_9600.yaml": (
         "train-clean-460_normalized",
         9600,
+        0,
     ),
-    "symAD_libritts_24000_hop300_train-clean-460_normalized_19200.yaml": (
+    "symAD_libritts_24000_hop300_train-clean-460_normalized_9600_context15900.yaml": (
         "train-clean-460_normalized",
-        19200,
+        9600,
+        15900,
     ),
 }
 
@@ -54,17 +58,17 @@ def _load_resolved_config(path: Path) -> dict:
 
 @pytest.mark.parametrize(("filename", "expected"), CONFIG_MATRIX.items())
 def test_training_config_matrix_matches_baseline(
-    filename: str, expected: tuple[str, int]
+    filename: str, expected: tuple[str, int, int]
 ) -> None:
-    """Each variant changes only its tag, training subset, and sample lengths."""
-    expected_subset, expected_length = expected
+    """Each variant changes only its tag, subset, and context contract."""
+    expected_subset, expected_length, expected_context = expected
     baseline = _load_yaml(BASELINE_PATH)
     variant_path = CONFIG_ROOT / filename
     raw_config = _load_yaml(variant_path)
     config = _load_resolved_config(variant_path)
 
     assert raw_config["base_config"] == BASELINE_PATH.name
-    assert len(raw_config) <= 5
+    assert len(raw_config) <= 6
 
     assert config["data"] == {
         "path": "/workspace/data/libritts",
@@ -76,7 +80,10 @@ def test_training_config_matrix_matches_baseline(
     }
     assert config["batch_length"] == expected_length
     assert config["adv_batch_length"] == expected_length
+    assert config.get("context_length", 0) == expected_context
+    assert config["batch_size"] == 16
     assert expected_length % 300 == 0
+    assert expected_context % 300 == 0
     assert config["tag"] == f"autoencoder/{Path(filename).stem}"
 
     comparable = copy.deepcopy(config)
@@ -84,6 +91,7 @@ def test_training_config_matrix_matches_baseline(
     comparable["data"]["subset"]["train"] = "train-clean-460"
     comparable["batch_length"] = 9600
     comparable["adv_batch_length"] = 9600
+    comparable.pop("context_length", None)
     assert comparable == baseline
 
 

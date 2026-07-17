@@ -1,0 +1,8 @@
+base_config: symAD_libritts_24000_hop300.yaml
+tag: autoencoder/symAD_libritts_24000_hop300_train-clean-460_normalized_9600_context15900
+data:
+    subset:
+        train: train-clean-460_normalized
+context_length: 15900
+batch_length: 9600
+adv_batch_length: 9600

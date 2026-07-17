@@ -12,6 +12,7 @@
 """Training flow of symmetric codec."""
 
 import logging
+import math
 import torch
 from trainer.trainerGAN import TrainerVQGAN
 
@@ -44,6 +45,41 @@ class Trainer(TrainerVQGAN):
         self.paradigm = config.get('paradigm', 'efficient') 
         self.generator_start = config.get('start_steps', {}).get('generator', 0)
         self.discriminator_start = config.get('start_steps', {}).get('discriminator', 200000)
+        self.context_length = config.get('context_length', 0)
+        enc_strides = config.get('generator_params', {}).get('enc_strides')
+        hop_length = self._validate_context(self.context_length, enc_strides)
+        self.num_context_frames = 0
+        if self.context_length:
+            self.num_context_frames = self.context_length // hop_length
+
+
+    @staticmethod
+    def _validate_context(context_length, enc_strides):
+        if context_length < 0:
+            raise ValueError("context_length must be non-negative")
+        if context_length == 0:
+            return None
+        if not enc_strides:
+            raise ValueError(
+                "generator_params.enc_strides is required when context_length is set"
+            )
+        hop_length = math.prod(enc_strides)
+        if context_length % hop_length:
+            raise ValueError(
+                f"context_length must be divisible by hop length {hop_length}"
+            )
+        return hop_length
+
+
+    def trim_context(self, audio):
+        """Remove real-audio warm-up context before loss computation."""
+        if self.context_length == 0:
+            return audio
+        if self.context_length >= audio.size(-1):
+            raise ValueError(
+                "context_length must leave at least one supervised audio sample"
+            )
+        return audio[..., self.context_length:]
 
 
     def _train_step(self, batch):
@@ -51,6 +87,7 @@ class Trainer(TrainerVQGAN):
         mode = 'train'
         x = batch
         x = x.to(self.device)
+        trimmed_x = self.trim_context(x)
 
         # check generator step
         if self.steps < self.generator_start:
@@ -86,7 +123,11 @@ class Trainer(TrainerVQGAN):
             gen_loss = 0.0
 
             # main genertor operation
-            y_, zq, z, vqloss, perplexity = self.model["generator"](x)
+            y_, zq, z, vqloss, perplexity = self.model["generator"](
+                x,
+                num_context_frames=self.num_context_frames,
+            )
+            trimmed_y = self.trim_context(y_)
 
             # perplexity info
             self._perplexity(perplexity, mode=mode)
@@ -95,14 +136,14 @@ class Trainer(TrainerVQGAN):
             gen_loss += self._vq_loss(vqloss, mode=mode)
             
             # metric loss
-            gen_loss += self._metric_loss(y_, x, mode=mode)
+            gen_loss += self._metric_loss(trimmed_y, trimmed_x, mode=mode)
             
             # adversarial loss
             if self.discriminator_train:
-                p_ = self.model["discriminator"](y_)
+                p_ = self.model["discriminator"](trimmed_y)
                 if self.config["use_feat_match_loss"]:
                     with torch.no_grad():
-                        p = self.model["discriminator"](x)
+                        p = self.model["discriminator"](trimmed_x)
                 else:
                     p = None
                 gen_loss += self._adv_loss(p_, p, mode=mode)
@@ -117,10 +158,14 @@ class Trainer(TrainerVQGAN):
         if self.discriminator_train:
             # re-compute y_ which leads better quality
             with torch.no_grad():
-                y_, _, _, _, _ = self.model["generator"](x)
+                y_, _, _, _, _ = self.model["generator"](
+                    x,
+                    num_context_frames=self.num_context_frames,
+                )
+                trimmed_y = self.trim_context(y_)
             
-            p = self.model["discriminator"](x)
-            p_ = self.model["discriminator"](y_.detach())
+            p = self.model["discriminator"](trimmed_x)
+            p_ = self.model["discriminator"](trimmed_y.detach())
 
             # discriminator loss & update discriminator
             self._update_discriminator(self._dis_loss(p_, p, mode=mode))
@@ -137,12 +182,17 @@ class Trainer(TrainerVQGAN):
         mode = 'eval'
         x = batch
         x = x.to(self.device)
+        trimmed_x = self.trim_context(x)
         
         # initialize generator loss
         gen_loss = 0.0
 
         # main genertor operation
-        y_, zq, z, vqloss, perplexity = self.model["generator"](x)
+        y_, zq, z, vqloss, perplexity = self.model["generator"](
+            x,
+            num_context_frames=self.num_context_frames,
+        )
+        trimmed_y = self.trim_context(y_)
 
         # perplexity info
         self._perplexity(perplexity, mode=mode)
@@ -151,12 +201,12 @@ class Trainer(TrainerVQGAN):
         gen_loss += self._vq_loss(vqloss, mode=mode)
         
         # metric loss
-        gen_loss += self._metric_loss(y_, x, mode=mode)
+        gen_loss += self._metric_loss(trimmed_y, trimmed_x, mode=mode)
 
         if self.discriminator_train:
             # adversarial loss
-            p_ = self.model["discriminator"](y_)
-            p = self.model["discriminator"](x)
+            p_ = self.model["discriminator"](trimmed_y)
+            p = self.model["discriminator"](trimmed_x)
             gen_loss += self._adv_loss(p_, p, mode=mode)
 
             # discriminator loss
@@ -168,4 +218,3 @@ class Trainer(TrainerVQGAN):
         
 
        
-

@@ -46,16 +46,26 @@ class TrainMain(TrainGAN):
     
     # DATA LOADER
     def initialize_data_loader(self):
-        logging.info(f"Loading datasets... (batch_lenght: {self.batch_length})")
+        context_length = self.config.get('context_length', 0)
+        logging.info(
+            f"Loading datasets... (batch_length: {self.batch_length}, "
+            f"context_length: {context_length})"
+        )
 
         if self.train_mode in ['autoencoder', 'vocoder']:
             train_set = self._audio('train')
             valid_set = self._audio('valid')
-            collater = CollaterAudio(batch_length=self.batch_length)
+            collater = CollaterAudio(
+                batch_length=self.batch_length,
+                context_length=context_length,
+            )
         elif self.train_mode in ['denoise']:
             train_set = self._audio_pair('noisy_train', 'clean_train')
             valid_set = self._audio_pair('noisy_valid', 'clean_valid')
-            collater = CollaterAudioPair(batch_length=self.batch_length)
+            collater = CollaterAudioPair(
+                batch_length=self.batch_length,
+                context_length=context_length,
+            )
         else:
             raise NotImplementedError(f"Train mode: {self.train_mode} is not supported!")
 

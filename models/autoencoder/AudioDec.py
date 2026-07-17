@@ -109,13 +109,16 @@ class Generator(torch.nn.Module):
             self.reset_parameters()
 
 
-    def forward(self, x):
+    def forward(self, x, num_context_frames=0):
         (batch, channel, length) = x.size()
         if channel != self.input_channels: 
             x = x.reshape(-1, self.input_channels, length) # (B, C, T) -> (B', C', T)
         x = self.encoder(x)
         z = self.projector(x)
-        zq, vqloss, perplexity = self.quantizer(z)
+        zq, vqloss, perplexity = self.quantizer(
+            z,
+            num_context_frames=num_context_frames,
+        )
         y = self.decoder(zq)
         return y, zq, z, vqloss, perplexity
     

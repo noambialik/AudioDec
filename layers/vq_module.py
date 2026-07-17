@@ -57,8 +57,30 @@ class VectorQuantize(nn.Module):
     
     def laplace_smoothing(self, x, n_categories, eps=1e-5):
         return (x + eps) / (x.sum() + n_categories * eps)
+
+    @staticmethod
+    def _validate_context_frames(num_context_frames, num_frames):
+        if num_context_frames < 0 or num_context_frames >= num_frames:
+            raise ValueError(
+                "num_context_frames must be in "
+                f"[0, {num_frames - 1}], got {num_context_frames}"
+            )
+
+    def _exclude_context_from_vq_training(
+        self,
+        input,
+        embed_onehot,
+        num_context_frames,
+    ):
+        valid_input = input[..., num_context_frames:, :]
+        valid_flatten = valid_input.reshape(-1, self.dim)
+        valid_embed_onehot = embed_onehot.view(
+            *input.shape[:-1], self.n_embed
+        )[..., num_context_frames:, :].reshape(-1, self.n_embed)
+        return valid_input, valid_flatten, valid_embed_onehot
     
-    def forward(self, input):
+    def forward(self, input, num_context_frames=0):
+        self._validate_context_frames(num_context_frames, input.size(-2))
         dtype = input.dtype
         flatten = input.reshape(-1, self.dim)
         dist = (
@@ -71,18 +93,36 @@ class VectorQuantize(nn.Module):
         embed_ind = embed_ind.view(*input.shape[:-1])
         quantize = F.embedding(embed_ind, self.embed.transpose(0, 1))
 
+        if num_context_frames == 0:
+            valid_input = input
+            valid_flatten = flatten
+            valid_embed_onehot = embed_onehot
+        else:
+            valid_input, valid_flatten, valid_embed_onehot = (
+                self._exclude_context_from_vq_training(
+                    input,
+                    embed_onehot,
+                    num_context_frames,
+                )
+            )
+
         if self.training:
-            self.ema_inplace(self.cluster_size, embed_onehot.sum(0), self.decay)
-            embed_sum = flatten.transpose(0, 1) @ embed_onehot
+            self.ema_inplace(
+                self.cluster_size,
+                valid_embed_onehot.sum(0),
+                self.decay,
+            )
+            embed_sum = valid_flatten.transpose(0, 1) @ valid_embed_onehot
             self.ema_inplace(self.embed_avg, embed_sum, self.decay)
             cluster_size = self.laplace_smoothing(self.cluster_size, self.n_embed, self.eps) * self.cluster_size.sum()
             embed_normalized = self.embed_avg / cluster_size.unsqueeze(0)
             self.embed.data.copy_(embed_normalized)
 
-        loss = F.mse_loss(quantize.detach(), input) * self.commitment
+        valid_quantize = quantize[..., num_context_frames:, :]
+        loss = F.mse_loss(valid_quantize.detach(), valid_input) * self.commitment
         quantize = input + (quantize - input).detach()
 
-        avg_probs = torch.mean(embed_onehot, dim=0)
+        avg_probs = torch.mean(valid_embed_onehot, dim=0)
         perplexity = torch.exp(-torch.sum(avg_probs * torch.log(avg_probs + 1e-10)))
 
         return quantize, loss, perplexity
@@ -116,13 +156,16 @@ class ResidualVQ(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList([VectorQuantize(**kwargs) for _ in range(num_quantizers)])
 
-    def forward(self, x):
+    def forward(self, x, num_context_frames=0):
         quantized_out = 0.
         residual = x
         all_losses = []
         all_perplexities = []
         for layer in self.layers:
-            quantized, loss, perplexity = layer(residual)
+            quantized, loss, perplexity = layer(
+                residual,
+                num_context_frames=num_context_frames,
+            )
             # Issue: https://github.com/lucidrains/vector-quantize-pytorch/issues/33
             # We found considering only the 1st layer VQ's graident results in better performance
             #residual = residual - quantized.detach() # considering all layers' graidents
