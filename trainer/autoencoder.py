@@ -88,6 +88,16 @@ class Trainer(TrainerVQGAN):
         x = batch
         x = x.to(self.device)
         trimmed_x = self.trim_context(x)
+        if self.steps == 0:
+            logging.info(
+                "[context trace, step 0] input=%s, context samples=[0:%d], "
+                "target samples=[%d:%d], trimmed input=%s",
+                tuple(x.shape),
+                self.context_length,
+                self.context_length,
+                x.size(-1),
+                tuple(trimmed_x.shape),
+            )
 
         # check generator step
         if self.steps < self.generator_start:
@@ -128,6 +138,29 @@ class Trainer(TrainerVQGAN):
                 num_context_frames=self.num_context_frames,
             )
             trimmed_y = self.trim_context(y_)
+            if self.steps == 0:
+                total_frames = z.size(-1)
+                logging.info(
+                    "[context trace, step 0] encoder latent=%s, "
+                    "quantized latent=%s, context frames=[0:%d], "
+                    "target frames=[%d:%d], context latent=%s, "
+                    "target latent=%s",
+                    tuple(z.shape),
+                    tuple(zq.shape),
+                    self.num_context_frames,
+                    self.num_context_frames,
+                    total_frames,
+                    tuple(z[..., :self.num_context_frames].shape),
+                    tuple(z[..., self.num_context_frames:].shape),
+                )
+                logging.info(
+                    "[context trace, step 0] generator output=%s, "
+                    "trimmed output=%s, metric/GAN pair=(%s, %s)",
+                    tuple(y_.shape),
+                    tuple(trimmed_y.shape),
+                    tuple(trimmed_y.shape),
+                    tuple(trimmed_x.shape),
+                )
 
             # perplexity info
             self._perplexity(perplexity, mode=mode)
