@@ -74,6 +74,38 @@ def test_audio_collater_prepends_context_to_supervised_batch() -> None:
     torch.testing.assert_close(batch[0, 0], torch.arange(7, dtype=torch.float))
 
 
+def test_context_and_matched_control_use_the_same_target_window() -> None:
+    audio = np.arange(10, dtype=np.float32)[:, None]
+    np.random.seed(17)
+    context_batch = CollaterAudio(
+        batch_length=4,
+        context_length=3,
+        sampling_context_length=3,
+    )([audio])
+    np.random.seed(17)
+    control_batch = CollaterAudio(
+        batch_length=4,
+        context_length=0,
+        sampling_context_length=3,
+    )([audio])
+
+    assert context_batch.shape == (1, 1, 7)
+    assert control_batch.shape == (1, 1, 4)
+    torch.testing.assert_close(control_batch, context_batch[..., 3:])
+
+
+def test_collater_rejects_model_context_larger_than_sampling_context() -> None:
+    with pytest.raises(
+        ValueError,
+        match="sampling_context_length must be at least context_length",
+    ):
+        CollaterAudio(
+            batch_length=4,
+            context_length=3,
+            sampling_context_length=2,
+        )
+
+
 def test_audio_pair_collater_uses_the_same_context_segment() -> None:
     clean = np.arange(7, dtype=np.float32)[:, None]
     noisy = clean + 100
@@ -117,8 +149,29 @@ def test_quantizer_zero_boundary_matches_the_original_call() -> None:
 def test_collater_rejects_audio_shorter_than_context_and_batch() -> None:
     audio = np.arange(6, dtype=np.float32)[:, None]
 
-    with pytest.raises(ValueError, match="at least 7 samples"):
+    with pytest.raises(ValueError, match="at least 7"):
         CollaterAudio(batch_length=4, context_length=3)([audio])
+
+
+def test_collater_does_not_silently_drop_a_short_clip() -> None:
+    valid = np.arange(7, dtype=np.float32)[:, None]
+    short = np.arange(6, dtype=np.float32)[:, None]
+
+    with pytest.raises(ValueError, match="batch index 1 has 6 samples"):
+        CollaterAudio(batch_length=4, context_length=3)([valid, short])
+
+
+def test_audio_pair_collater_rejects_misaligned_clips() -> None:
+    clean = np.arange(7, dtype=np.float32)[:, None]
+    noisy = np.arange(8, dtype=np.float32)[:, None]
+
+    with pytest.raises(ValueError, match="batch index 0 is misaligned: 7 != 8"):
+        CollaterAudioPair(batch_length=4, context_length=3)([(clean, noisy)])
+
+
+def test_required_audio_length_preserves_context_and_legacy_boundaries() -> None:
+    assert CollaterAudio(9600, 15900).minimum_frames == 25500
+    assert CollaterAudio(9600, 0).minimum_frames == 9601
 
 
 def test_quantizer_uses_only_target_frames_for_vq_statistics() -> None:
@@ -128,17 +181,28 @@ def test_quantizer_uses_only_target_frames_for_vq_statistics() -> None:
     with torch.no_grad():
         layer.embed.copy_(torch.tensor([[0.0, 10.0]]))
         layer.embed_avg.copy_(layer.embed)
+    control_quantizer = copy.deepcopy(quantizer)
 
     prefix = torch.zeros(1, 1, 53)
     target = torch.full((1, 1, 32), 10.0)
     z = torch.cat((prefix, target), dim=-1)
 
     zq, losses, perplexities = quantizer(z, num_context_frames=53)
+    _, control_losses, control_perplexities = control_quantizer(
+        target,
+        num_context_frames=0,
+    )
 
     assert zq.shape == z.shape
     assert losses.shape == perplexities.shape == (1,)
     torch.testing.assert_close(layer.cluster_size, torch.tensor([0.0, 32.0]))
     torch.testing.assert_close(perplexities, torch.ones(1))
+    torch.testing.assert_close(
+        layer.cluster_size,
+        control_quantizer.codebook.layers[0].cluster_size,
+    )
+    torch.testing.assert_close(losses, control_losses)
+    torch.testing.assert_close(perplexities, control_perplexities)
 
 
 @pytest.mark.parametrize("num_context_frames", (-1, 5))
@@ -245,6 +309,30 @@ def test_autoencoder_losses_and_discriminator_use_only_target_suffix() -> None:
     assert predicted.shape[-1] == natural.shape[-1] == 4
     torch.testing.assert_close(natural, batch[..., 3:])
     assert all(call.shape[-1] == 4 for call in trainer.model["discriminator"].calls)
+
+
+@pytest.mark.parametrize(
+    ("context_length", "num_context_frames", "input_length"),
+    ((0, 0, 4), (3, 1, 7)),
+)
+def test_context_and_control_have_the_same_optimizer_update_cadence(
+    context_length,
+    num_context_frames,
+    input_length,
+) -> None:
+    trainer = _context_trainer(context_length, num_context_frames)
+    generator_updates = []
+    discriminator_updates = []
+    trainer._metric_loss = lambda *args, **kwargs: torch.tensor(0.0)
+    trainer._update_generator = generator_updates.append
+    trainer._update_discriminator = discriminator_updates.append
+    batch = torch.arange(input_length, dtype=torch.float).reshape(1, 1, -1)
+
+    trainer._train_step(batch)
+
+    assert trainer.steps == 1
+    assert len(generator_updates) == 1
+    assert len(discriminator_updates) == 1
 
 
 def test_zero_context_passes_zero_frames_and_preserves_audio() -> None:

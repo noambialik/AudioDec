@@ -15,24 +15,28 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_ROOT = PROJECT_ROOT / "config" / "autoencoder"
 BASELINE_PATH = CONFIG_ROOT / "symAD_libritts_24000_hop300.yaml"
 CONFIG_MATRIX = {
-    "symAD_libritts_24000_hop300_train-clean-460_9600.yaml": (
+    "symAD_libritts_24000_hop300_train-clean-460_9600_no_context_sample15900.yaml": (
         "train-clean-460",
         9600,
         0,
+        15900,
     ),
-    "symAD_libritts_24000_hop300_train-clean-460_9600_context15900.yaml": (
+    "symAD_libritts_24000_hop300_train-clean-460_9600_real_context15900.yaml": (
         "train-clean-460",
         9600,
         15900,
+        15900,
     ),
-    "symAD_libritts_24000_hop300_train-clean-460_normalized_9600.yaml": (
+    "symAD_libritts_24000_hop300_train-clean-460_normalized_9600_no_context_sample15900.yaml": (
         "train-clean-460_normalized",
         9600,
         0,
+        15900,
     ),
-    "symAD_libritts_24000_hop300_train-clean-460_normalized_9600_context15900.yaml": (
+    "symAD_libritts_24000_hop300_train-clean-460_normalized_9600_real_context15900.yaml": (
         "train-clean-460_normalized",
         9600,
+        15900,
         15900,
     ),
 }
@@ -58,17 +62,17 @@ def _load_resolved_config(path: Path) -> dict:
 
 @pytest.mark.parametrize(("filename", "expected"), CONFIG_MATRIX.items())
 def test_training_config_matrix_matches_baseline(
-    filename: str, expected: tuple[str, int, int]
+    filename: str, expected: tuple[str, int, int, int]
 ) -> None:
     """Each variant changes only its tag, subset, and context contract."""
-    expected_subset, expected_length, expected_context = expected
+    expected_subset, expected_length, expected_context, expected_sampling_context = expected
     baseline = _load_yaml(BASELINE_PATH)
     variant_path = CONFIG_ROOT / filename
     raw_config = _load_yaml(variant_path)
     config = _load_resolved_config(variant_path)
 
     assert raw_config["base_config"] == BASELINE_PATH.name
-    assert len(raw_config) <= 6
+    assert len(raw_config) <= 7
 
     assert config["data"] == {
         "path": "/workspace/data/libritts",
@@ -81,6 +85,10 @@ def test_training_config_matrix_matches_baseline(
     assert config["batch_length"] == expected_length
     assert config["adv_batch_length"] == expected_length
     assert config.get("context_length", 0) == expected_context
+    assert (
+        config.get("sampling_context_length", expected_context)
+        == expected_sampling_context
+    )
     assert config["batch_size"] == 16
     assert expected_length % 300 == 0
     assert expected_context % 300 == 0
@@ -92,6 +100,7 @@ def test_training_config_matrix_matches_baseline(
     comparable["batch_length"] = 9600
     comparable["adv_batch_length"] = 9600
     comparable.pop("context_length", None)
+    comparable.pop("sampling_context_length", None)
     assert comparable == baseline
 
 
@@ -104,6 +113,25 @@ def test_training_configs_have_distinct_checkpoint_directories() -> None:
 
     assert len(tags) == len(CONFIG_MATRIX)
     assert len({Path("/workspace/data/audiodec/exp") / tag for tag in tags}) == 4
+
+
+@pytest.mark.parametrize("normalized", (False, True))
+def test_matched_control_and_context_configs_differ_only_by_model_context(
+    normalized: bool,
+) -> None:
+    normalized_part = "_normalized" if normalized else ""
+    prefix = f"symAD_libritts_24000_hop300_train-clean-460{normalized_part}_9600"
+    control = _load_resolved_config(
+        CONFIG_ROOT / f"{prefix}_no_context_sample15900.yaml"
+    )
+    context = _load_resolved_config(
+        CONFIG_ROOT / f"{prefix}_real_context15900.yaml"
+    )
+
+    control.pop("tag")
+    context.pop("tag")
+    assert context.pop("context_length") == 15900
+    assert context == control
 
 
 def test_experiment_tag_resolution() -> None:

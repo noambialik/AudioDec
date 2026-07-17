@@ -153,14 +153,16 @@ specific training configuration on the GPU exposed as `cuda:0`:
 
 ```bash
 docker compose run --rm train-libritts \
-  --config config/autoencoder/symAD_libritts_24000_hop300_train-clean-460_9600_context15900.yaml \
+  --config config/autoencoder/symAD_libritts_24000_hop300_train-clean-460_9600_real_context15900.yaml \
   --gpu 0
 ```
 
 The context recipes keep the 9,600-sample supervised region and batch size 16,
 but prepend 15,900 samples of contiguous real audio to warm up the causal
-autoencoder. The two recipes ending in `_9600.yaml` remain zero-context
-controls.
+autoencoder. For a controlled comparison, use the corresponding recipe ending
+in `_9600_no_context_sample15900.yaml`: it samples the same 25,500-sample windows
+and supervises the same suffix, but passes only the final 9,600 samples to the
+model.
 
 Resume from an existing checkpoint by passing the container path through to
 the upstream trainer:

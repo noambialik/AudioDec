@@ -150,4 +150,3 @@ class MultiDataset(SingleDataset):
     
     def __len__(self):
         return self.file_num
-

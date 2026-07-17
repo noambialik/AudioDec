@@ -1,0 +1,4 @@
+base_config: symAD_libritts_24000_hop300.yaml
+tag: autoencoder/symAD_libritts_24000_hop300_train-clean-460_9600_real_context15900
+context_length: 15900
+sampling_context_length: 15900
