@@ -90,7 +90,15 @@ class SingleDataset(Dataset):
 
     def _load_data(self, filename, load_fn):
         if load_fn == sf.read:
-            data, _ = load_fn(filename, always_2d=True) # (T, C)
+            for attempt in range(1, 4):
+                try:
+                    data, _ = load_fn(filename, always_2d=True) # (T, C)
+                    break
+                except (sf.LibsndfileError, OSError) as error:
+                    if attempt == 3:
+                        raise RuntimeError(
+                            f"Failed to read audio file after 3 attempts: {filename}"
+                        ) from error
         else:
             data = load_fn(filename)
         return data
