@@ -60,34 +60,40 @@ class TrainMain(TrainGAN):
         if self.train_mode in ['autoencoder', 'vocoder']:
             train_set = self._audio('train')
             valid_set = self._audio('valid')
-            collater = CollaterAudio(
-                batch_length=self.batch_length,
-                context_length=context_length,
-                sampling_context_length=sampling_context_length,
-            )
+            collater_class = CollaterAudio
         elif self.train_mode in ['denoise']:
             train_set = self._audio_pair('noisy_train', 'clean_train')
             valid_set = self._audio_pair('noisy_valid', 'clean_valid')
-            collater = CollaterAudioPair(
-                batch_length=self.batch_length,
-                context_length=context_length,
-                sampling_context_length=sampling_context_length,
-            )
+            collater_class = CollaterAudioPair
         else:
             raise NotImplementedError(f"Train mode: {self.train_mode} is not supported!")
+
+        train_collater = collater_class(
+            batch_length=self.batch_length,
+            context_length=context_length,
+            sampling_context_length=sampling_context_length,
+            random_segment=True,
+        )
+        one_second = self.config['sampling_rate']
+        valid_collater = collater_class(
+            batch_length=max(self.batch_length, one_second),
+            context_length=context_length,
+            sampling_context_length=sampling_context_length,
+            random_segment=False,
+        )
 
         logging.info(f"The number of training files = {len(train_set)}.")
         logging.info(f"The number of validation files = {len(valid_set)}.")
         dataset = {'train': train_set, 'dev': valid_set}
-        self._data_loader(dataset, collater)
+        self._data_loader(dataset, train_collater, valid_collater)
 
 
-    def _data_loader(self, dataset, collater):
+    def _data_loader(self, dataset, train_collater, valid_collater):
         self.data_loader = {
             'train': DataLoader(
                 dataset=dataset['train'],
                 shuffle=True,
-                collate_fn=collater,
+                collate_fn=train_collater,
                 batch_size=self.config['batch_size'],
                 num_workers=self.config['num_workers'],
                 pin_memory=self.config['pin_memory'],
@@ -95,7 +101,7 @@ class TrainMain(TrainGAN):
             'dev': DataLoader(
                 dataset=dataset['dev'],
                 shuffle=False,
-                collate_fn=collater,
+                collate_fn=valid_collater,
                 batch_size=self.config['batch_size'],
                 num_workers=self.config['num_workers'],
                 pin_memory=self.config['pin_memory'],

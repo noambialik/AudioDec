@@ -3,6 +3,8 @@ sounddevice
 numpy
 scikit-learn
 librosa
+requests
+torchmetrics
 argparse
 pyyaml
 tqdm

@@ -23,12 +23,14 @@ class CollaterAudio(object):
         batch_length=9600,
         context_length=0,
         sampling_context_length=None,
+        random_segment=True,
     ):
         """
         Args:
             batch_length (int): The length of audio signal batch.
             context_length (int): Length of real audio prepended for warm-up.
             sampling_context_length (int): Prefix sampled before the target.
+            random_segment (bool): Randomly choose the segment start when true.
 
         """
         if sampling_context_length is None:
@@ -40,8 +42,10 @@ class CollaterAudio(object):
                 "sampling_context_length must be at least context_length"
             )
         self.sampling_context_length = sampling_context_length
+        self.batch_length = batch_length
         self.sample_length = sampling_context_length + batch_length
         self.trim_length = sampling_context_length - context_length
+        self.random_segment = random_segment
         if sampling_context_length == 0:
             # Preserve the legacy strict `len(audio) > batch_length` contract.
             self.minimum_frames = self.sample_length + 1
@@ -69,6 +73,10 @@ class CollaterAudio(object):
     
 
     def _random_segment(self, xs):
+        if not self.random_segment:
+            starts = np.zeros(len(xs), dtype=int)
+            return starts, starts + self.sample_length
+
         start_offsets = []
         for x in xs:
             last_valid_start = len(x) - self.sample_length

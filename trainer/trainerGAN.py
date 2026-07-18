@@ -21,6 +21,7 @@ from tensorboardX import SummaryWriter
 from tqdm import tqdm
 
 from trainer.checkpoint import retried_save_checkpoint
+from trainer.nisqa import NISQAValidationEvaluator
 
 
 class TrainerGAN(abc.ABC):
@@ -63,6 +64,9 @@ class TrainerGAN(abc.ABC):
         self.total_train_loss = defaultdict(float)
         self.total_eval_loss = defaultdict(float)
         self.train_max_steps = config.get("train_max_steps", 0)
+        self.nisqa_evaluator = NISQAValidationEvaluator(
+            sample_rate=config["sampling_rate"]
+        )
 
     
     @abc.abstractmethod
@@ -179,6 +183,7 @@ class TrainerGAN(abc.ABC):
     def _eval_epoch(self):
         """One epoch of evaluation."""
         logging.info(f"(Steps: {self.steps}) Start evaluation.")
+        score_nisqa = self.nisqa_evaluator.start_evaluation(self.steps)
         # change mode
         for key in self.model.keys():
             self.model[key].eval()
@@ -195,11 +200,16 @@ class TrainerGAN(abc.ABC):
             f"({eval_steps_per_epoch} steps per epoch)."
         )
 
-        # average loss
+        # average losses and add scheduled quality metrics
         for key in self.total_eval_loss.keys():
             self.total_eval_loss[key] /= eval_steps_per_epoch
+        if score_nisqa:
+            self.total_eval_loss["eval/nisqa_mos"] = (
+                self.nisqa_evaluator.compute_mos()
+            )
+        for key, value in self.total_eval_loss.items():
             logging.info(
-                f"(Steps: {self.steps}) {key} = {self.total_eval_loss[key]:.4f}."
+                f"(Steps: {self.steps}) {key} = {value:.4f}."
             )
 
         # record
@@ -216,6 +226,9 @@ class TrainerGAN(abc.ABC):
     def _metric_loss(self, predict_y, natural_y, mode='train'):
         """Metric losses."""
         metric_loss=0.0
+
+        if mode == 'eval':
+            self.nisqa_evaluator.update(predict_y)
 
         # mel spectrogram loss
         if self.config.get('use_mel_loss', False):
@@ -241,7 +254,7 @@ class TrainerGAN(abc.ABC):
             metric_loss += shape_loss
         
         return metric_loss
-    
+
 
     def _adv_loss(self, predict_p, natural_p=None, mode='train'):
         """Adversarial loss."""

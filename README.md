@@ -137,6 +137,12 @@ docker compose up tensorboard
 Open `http://localhost:6006`. Compose maps host port 6006 to the TensorBoard
 server, which reads every experiment beneath `/workspace/data/audiodec/exp`.
 
+Every 100,000 training steps, validation reports NISQA overall MOS as
+`eval/nisqa_mos` in TensorBoard. It scores the first 64 validation files using
+deterministic segments of at least one second. On first use, TorchMetrics
+downloads the pretrained NISQA weights; a missing dependency or failed
+download stops that validation run explicitly.
+
 Compose exposes host GPU indices 0 through 3 to the container in the same
 order, so `--gpu N` selects host GPU N. The service runs as the owner of the
 mounted data root, so checkpoints are not left root-owned. Checkpoints and
