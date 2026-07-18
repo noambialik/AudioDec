@@ -19,6 +19,8 @@ if [[ "${explicit_config}" == false ]]; then
   )
 fi
 
+run_tag="$(python -c 'import sys; from bin.utils import load_training_config, resolve_experiment_tag; args = sys.argv[1:]; value = lambda names: next((argument.split("=", 1)[1] if "=" in argument else args[index + 1] for index, argument in enumerate(args) if argument.split("=", 1)[0] in names), None); print(resolve_experiment_tag(load_training_config(value(("-c", "--config"))), value(("--tag",))))' "${training_args[@]}")"
+
 set +e
 python -c 'import torch; assert torch.cuda.is_available(), "CUDA is required"; assert torch.cuda.device_count() == 4, f"expected 4 mapped GPUs, found {torch.cuda.device_count()}"; print("Mapped GPUs:", ", ".join(f"cuda:{index}={torch.cuda.get_device_name(index)}" for index in range(torch.cuda.device_count())))' && \
 python /workspace/AudioDec/codecTrain.py \
@@ -35,8 +37,8 @@ else
   status=failed
 fi
 duration_seconds="$(( $(date +%s) - started_at_seconds ))"
-printf -v body 'status=%s\nhost=%s\nduration_seconds=%s\n' \
-  "${status}" "$(hostname)" "${duration_seconds}"
+printf -v body 'status=%s\ntag=%s\nhost=%s\nduration_seconds=%s\n' \
+  "${status}" "${run_tag}" "$(hostname)" "${duration_seconds}"
 
 if ! python -c 'import sys; from urllib import request; req = request.Request("https://ntfy.sh/noamb_audiodec", data=sys.argv[2].encode("utf-8"), method="POST", headers={"Title": sys.argv[1], "Content-Type": "text/plain; charset=utf-8"}); request.urlopen(req, timeout=10).close()' \
   "AudioDec LibriTTS training ${result}" "${body}"; then
